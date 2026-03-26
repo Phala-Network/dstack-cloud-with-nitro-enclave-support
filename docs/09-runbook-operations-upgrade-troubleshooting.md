@@ -40,6 +40,10 @@ Provide structured troubleshooting flows for issues such as:
 - Enclave workloads failing to start or connect
 - On-chain authorization failures
 - Monitoring alerts indicating degraded performance or availability
+- Governance and multisig issues, such as:
+  - Governance transactions stuck in the multisig or timelock queue
+  - Mistaken transactions queued but not yet executed
+  - Failed governance executions due to parameter or state errors
 
 Each flow should include:
 
@@ -55,6 +59,11 @@ Define emergency playbooks for:
 - Failing over between environments or regions (if applicable)
 - Recovering from data corruption or configuration mistakes
 
+For governance-specific emergencies, describe:
+
+- How to quickly block or revoke authorization for a compromised enclave measurement through the multisig and timelock
+- How to coordinate an emergency change of multisig owners or thresholds while preserving control over KMS-related contracts
+
 ### 7. Checklists
 
 Include concise checklists for:
@@ -62,4 +71,3 @@ Include concise checklists for:
 - Pre-release and pre-change reviews
 - Post-change validation
 - Quarterly or periodic operational reviews
-

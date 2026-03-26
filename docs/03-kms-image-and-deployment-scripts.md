@@ -30,6 +30,10 @@ Describe:
 
 - The structure of deployment scripts (e.g., shell scripts, Terraform modules, Helm charts)
 - Required input parameters (e.g., project ID, network, image version, governance contract addresses)
+  - This should explicitly include governance-related parameters such as:
+    - The admin Safe (multisig) address that owns or controls the KMS contracts
+    - The timelock module address attached to the Safe, if applicable
+    - Any other governance module addresses that the KMS needs to recognize
 - Typical deployment topologies (single-region, multi-region, staging vs. production)
 
 Where applicable, this section should include examples of command lines or configuration snippets, but keep secrets and environment-specific details out of the repository.
@@ -50,5 +54,6 @@ Provide step-by-step procedures for:
 - Upgrading the KMS image in an existing environment
 - Rolling back to a previous image in case of issues
 
-Each procedure should include checks and roll-back criteria.
+New environment deployment procedures should assume that the governance Safe and timelock module have already been deployed and configured according to the governance deployment manual, and that their addresses are available as inputs to the deployment scripts.
 
+Each procedure should include checks and roll-back criteria.
