@@ -4,6 +4,8 @@
 
 This document explains how Nitro Enclave workloads integrate with the KMS using RA-TLS and the `dstack-agent-nitro` library. It is aimed at application developers and platform engineers responsible for enclave workloads.
 
+This guide complements the reference Nitro application and CI/CD template provided in the `dstack-nitro-enclave-app-template` repository. That template can be used as a starting point for building and releasing enclave applications that integrate with this KMS.
+
 ### 2. Overview of RA-TLS in This Project
 
 Provide a concise overview of:
@@ -53,3 +55,13 @@ Define a simple demo scenario that:
 
 The demo should be reproducible on a developer or test environment and serve as the basis for the "Verified RA-TLS demo" deliverable.
 
+As a concrete reference, the `dstack-nitro-enclave-app-template` repository provides:
+
+- A minimal Nitro enclave application that can be wired to `dstack-agent-nitro` and the KMS
+- A CI workflow that:
+  - Builds an enclave image (EIF)
+  - Computes measurements and an `OS_IMAGE_HASH` value
+  - Publishes a GitHub release including measurement and image metadata
+  - Produces Sigstore attestations that can be used to verify the provenance of the enclave image
+
+In production, the measurements and `OS_IMAGE_HASH` produced by this pipeline should not be registered on-chain directly by an externally owned account. Instead, they should be used as inputs to governance proposals executed through the multisig and timelock setup described in the governance documents.

@@ -12,6 +12,9 @@ List:
 - Supported cloud environments and TEE types
 - Associated Nitro enclave images (where applicable)
 - Relevant smart contract versions and addresses (if appropriate to document here)
+- Governance stack components, including:
+  - The multisig wallet (for example, Safe) that owns or controls KMS-related contracts
+  - The timelock module attached to the multisig and its key parameters (e.g., default delay)
 
 ### 3. Changes Since Earlier Versions
 
@@ -30,6 +33,11 @@ Document:
 - Required contract or governance versions
 - Any migration steps required when upgrading from previous versions
 
+For governance, explicitly state:
+
+- Dependencies on the chosen multisig and timelock implementations
+- Any assumptions about available tooling (for example, Safe web interface support on the target network)
+
 ### 5. Known Issues
 
 List:
@@ -46,4 +54,3 @@ Provide:
 - Rollback considerations and constraints
 
 Reference the operations runbook for detailed procedures.
-

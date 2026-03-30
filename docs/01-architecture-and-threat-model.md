@@ -19,6 +19,8 @@ At a high level, the system consists of:
 - On-chain smart contracts (DstackApp, DstackKms, and governance contracts)
 - Supporting infrastructure such as RPC endpoints, monitoring, and CI/CD pipelines
 
+Governance over the KMS contracts and critical configuration is not controlled by a single externally owned account (EOA). Instead, it is managed by a multisig wallet (for example, Safe) combined with a timelock module. All sensitive on-chain actions that affect the KMS (such as updating allowed measurements, changing administrators, or upgrading contracts) must be executed through this multisig and are subject to the configured timelock delay.
+
 The KMS exposes a limited API surface (for example, `getKey(name)`) and enforces access control using attestation, measurement-based authorization, and on-chain governance policies.
 
 ### 3. Components and Data Flows
@@ -37,9 +39,9 @@ For each major interaction (e.g., key request, governance change, image upgrade)
 
 This section should identify:
 
-- Critical assets: root keys, tenant keys, configuration state, governance control
-- Trust anchors: TEEs, on-chain contracts, multisig signers, and governance rules
-- Trust boundaries: between cloud provider and workload, between host and enclave, between off-chain systems and on-chain governance
+- Critical assets: root keys, tenant keys, configuration state, governance control, and the governance multisig itself (including the list of signers, the signature threshold, and timelock parameters)
+- Trust anchors: TEEs, on-chain contracts, the multisig and timelock modules, and the governance rules encoded in contracts and policies
+- Trust boundaries: between cloud provider and workload, between host and enclave, between off-chain systems and on-chain governance, and between individual multisig signers and the multisig contract they collectively control
 
 It should clearly state what is assumed to be trusted, partially trusted, or untrusted, and why.
 
@@ -52,6 +54,7 @@ This section outlines the main attacker types and threat scenarios, for example:
 - Malicious or compromised Nitro Enclave workload
 - Compromised RPC providers or network attackers
 - Misconfigured or malicious governance participants
+- Governance and multisig-specific threats, such as compromised or colluding multisig signers, unsafe changes to timelock parameters, or attempts to bypass governance by interacting directly with contracts
 
 For each threat, the document should describe:
 
@@ -72,4 +75,3 @@ Where possible, these invariants should be linked back to specific mechanisms in
 ### 7. Open Questions and Future Work
 
 Finally, this section should track open security questions, areas for future hardening, and dependencies on external audits or formal verification work.
-
