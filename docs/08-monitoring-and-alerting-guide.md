@@ -71,17 +71,30 @@ At a minimum:
 
 ### 5. Alerting and Incident Management
 
-Describe:
+Define alert rules with clear conditions, thresholds, and severities. Example categories:
 
-- Alert rules (conditions, thresholds, and severities)
-- Integration with Incident.io (how alerts become incidents, routing, and escalation)
-- On-call schedules and response expectations
+- **KMS availability and latency**
+  - Alert if KMS error rate exceeds a threshold (for example, >1% of requests failing with 5xx over 5 minutes).
+  - Alert if p95 `getKey(name)` latency exceeds an agreed SLO (for example, >500 ms) for a sustained period.
 
-Include alerts related to governance and multisig, such as:
+- **RA-TLS and authorization**
+  - Alert on sustained RA-TLS failures (for example, `kms_ra_tls_failures_total` increasing rapidly).
+  - Alert on repeated authorization denials for the same enclave (which may indicate misconfiguration).
 
-- Critical governance actions stuck in the timelock queue beyond an expected window
-- Unexpected or frequent changes to timelock parameters (e.g., cooldown shortened below agreed thresholds)
-- Repeated failures of governance transactions or unusually high governance activity that may indicate misconfiguration or abuse
+- **Nitro enclave health**
+  - Alert if the number of running enclave instances drops below the expected count.
+  - Alert on excessive enclave restarts within a short window.
+
+- **Governance and multisig**
+  - Alert if critical governance actions are stuck in the timelock queue beyond an expected window.
+  - Alert on unexpected or frequent changes to timelock parameters (e.g., cooldown shortened below agreed thresholds).
+  - Alert on repeated failures of governance transactions or unusually high governance activity that may indicate misconfiguration or abuse.
+
+Integration with Incident.io should:
+
+- Create incidents from high-severity alerts (for example, KMS outage, governance misconfiguration)
+- Route incidents to the appropriate on-call rotation (platform, security, or governance)
+- Provide runbook links for quick reference during triage
 
 ### 6. Operational Procedures
 
