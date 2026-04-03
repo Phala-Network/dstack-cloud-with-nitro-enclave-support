@@ -48,6 +48,13 @@ Summarize:
 - Which environment and versions (KMS image, enclave image, contracts) were used
 - Overall result (e.g., pass rate, major issues found)
 
+For critical scenarios (for example, E2E-001 and GOV-001), provide enough detail that the tests can be repeated independently, including:
+
+- Environment name (staging, pre-production, production candidate)
+- KMS image tag and OS image version
+- Enclave image version and `OS_IMAGE_HASH`
+- Governance contract and Safe addresses used
+
 ### 5. Detailed Results and Findings
 
 Document:
@@ -62,6 +69,12 @@ Describe:
 
 - Additional checks performed specifically in pre-production (e.g., realistic traffic patterns, integration with customer systems)
 - Sign-off criteria and who approved them
+
+Example checks may include:
+
+- Load tests at expected peak traffic levels
+- End-to-end flows involving real or representative Nitro workloads
+- Governance operations performed with production-like signer sets and timelock settings
 
 ### 7. Known Limitations and Risks
 
