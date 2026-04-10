@@ -22,7 +22,6 @@ docs/
 │   ├── run-dstack-on-gcp.md               ← Run a dstack CVM on GCP
 │   ├── run-dstack-on-nitro.md             ← Run a dstack CVM on AWS Nitro
 │   ├── run-dstack-kms-on-gcp.md           ← Run a dstack-kms CVM on GCP
-│   ├── run-dstack-kms-on-nitro.md         ← Run a dstack-kms CVM on AWS Nitro
 │   ├── deploy-onchain-kms.md              ← Deploy on-chain KMS smart contracts
 │   ├── register-enclave-measurement.md    ← Register Enclave measurements on-chain
 │   └── manage-governance.md               ← Governance operations (propose, approve, execute)
@@ -254,16 +253,6 @@ This document focuses on **how dstack-cloud integrates attestation mechanisms on
 - Verify KMS is running
 - Common issues
 
-#### `how-to/run-dstack-kms-on-nitro.md` — Run a dstack-kms CVM on AWS Nitro
-
-- Prerequisites
-- Create a KMS project (`dstack-cloud new`)
-- Configure the KMS docker-compose.yaml (including VSOCK proxy)
-- Deploy the KMS CVM as a Nitro Enclave (`dstack-cloud deploy`)
-- Complete KMS Bootstrap (first-time initialization)
-- Verify KMS is running
-- Common issues
-
 #### `how-to/deploy-onchain-kms.md` — Deploy On-chain KMS Smart Contracts
 
 - Prerequisites (Hardhat, wallet, testnet/mainnet gas)
@@ -309,7 +298,7 @@ This document focuses on **how dstack-cloud integrates attestation mechanisms on
   5. Check the status (`dstack-cloud status`)
   6. Access your application
 - **Next steps:**
-  - Set up KMS for key protection → [Run a dstack-kms CVM on AWS Nitro](../how-to/run-dstack-kms-on-nitro.md)
+  - Set up KMS for key protection → [Run a dstack-kms CVM on GCP](../how-to/run-dstack-kms-on-gcp.md)
   - Register measurements for on-chain authorization → [Register Workload Measurements](../how-to/register-enclave-measurement.md)
   - Learn the underlying concepts → [Concept Guides](../concepts/overview.md)
 
@@ -421,7 +410,7 @@ Core terminology definitions:
 |-------------------|--------------|-------|
 | 01-architecture-and-threat-model.md | concepts/overview.md + concepts/security-model.md | Split into overview and security model |
 | 02-gcp-environment-and-cvm-setup-guide.md | how-to/run-dstack-on-gcp.md + how-to/run-dstack-kms-on-gcp.md | Split into dstack CVM and dstack-kms CVM |
-| 03-kms-image-and-deployment-scripts.md | how-to/run-dstack-kms-on-gcp.md + how-to/run-dstack-kms-on-nitro.md | Split by environment |
+| 03-kms-image-and-deployment-scripts.md | how-to/run-dstack-kms-on-gcp.md | KMS runs on GCP only |
 | 04-nitro-integration-and-ra-tls-guide.md | concepts/nitro-enclave.md + concepts/attestation-integration.md + how-to/register-enclave-measurement.md | Split into concepts and operations |
 | 05-governance-and-onchain-integration-design.md | concepts/governance.md | Core content retained |
 | 06-governance-deployment-and-operations-manual.md | how-to/deploy-onchain-kms.md + how-to/manage-governance.md | Split into deployment and operations |
