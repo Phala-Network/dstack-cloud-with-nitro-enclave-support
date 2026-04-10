@@ -1,4 +1,4 @@
-# Quick Start: Deploy Your First dstack App on GCP
+# Quick Start: Deploy Your First Dstack App on GCP
 
 This tutorial walks you through deploying a Docker application as a Confidential VM on Google Cloud Platform using dstack-cloud.
 
@@ -219,9 +219,13 @@ When you deployed your application:
 4. **TEE Attestation** — The Guest Agent provides attestation proof via the TDX + vTPM mechanism
 5. **TLS Certificate** — Gateway automatically provisions ACME certificates for your domain
 
-Your application now runs in a hardware-protected environment where even the cloud provider cannot access the memory or data.
+### Key Delivery via KMS
+
+dstack uses an external **Key Management Service (dstack-kms)** to deliver keys to your confidential workloads. The KMS runs in its own TEE and only dispatches keys to workloads that pass attestation verification.
 
 ## Managing Your Deployment
+
+Your application now runs in a hardware-protected environment where even the cloud provider cannot access the memory or data.
 
 Common management commands:
 

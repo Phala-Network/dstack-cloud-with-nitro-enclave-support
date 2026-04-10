@@ -34,9 +34,37 @@ Set the following values:
 project = "YOUR_PROJECT_ID"
 zone = "us-central1-a"
 bucket = "gs://YOUR_BUCKET_NAME"
+
+[kms]
+url = "https://your-kms-host:12001"
+
+[gateway]
+url = "https://your-gateway-host"
 ```
 
-The bucket is used to store CVM images during the build and deploy process. Create it if it does not exist:
+### KMS Options
+
+You have two options for the KMS:
+
+| Option | Description | When to Use |
+|--------|-------------|-------------|
+| **Phala Official KMS** | Use the KMS hosted by Phala Network | Quick start, development, testing |
+| **Self-hosted KMS** | Deploy your own KMS instance | Production, compliance requirements, full control |
+
+For self-hosted KMS, you can deploy on:
+- **GCP** — See [Run a dstack-kms CVM on GCP](run-dstack-kms-on-gcp.md)
+- **Intel TDX Bare Metal** — Contact Phala for deployment guide
+
+![GCP KMS Key Delivery](../images/kms-key-delivery-gcp-v5.png)
+
+When your GCP CVM starts, the dstack-agent inside contacts the KMS via RA-TLS to retrieve encrypted keys. The KMS verifies the CVM's attestation before dispatching keys.
+
+### Configuration Fields
+
+- **`[kms] url`** — Address of your dstack-kms instance. The CVM's Guest Agent contacts this URL to retrieve keys after attestation. Required if you are using KMS mode (recommended for production).
+- **`[gateway] url`** — Address of the dstack gateway. The gateway handles TLS termination and routes traffic to your CVMs.
+
+The `[gcp] bucket` is used to store CVM images during the build and deploy process. Create it if it does not exist:
 
 ```bash
 gsutil mb gs://YOUR_BUCKET_NAME

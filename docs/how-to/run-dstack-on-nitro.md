@@ -21,6 +21,36 @@ The deployment process:
 4. **Register OS_IMAGE_HASH on-chain** — Authorize the enclave to receive keys
 5. **Deploy on EC2** — Launch the enclave on AWS
 
+### Key Delivery via KMS
+
+On AWS Nitro, your enclave retrieves keys from an external **dstack-kms** service. Unlike GCP (where the Guest Agent handles everything automatically), on Nitro the `dstack-util` tool contacts the KMS through a VSOCK proxy running on the host EC2 instance.
+
+**KMS Options:**
+
+| Option | Description | When to Use |
+|--------|-------------|-------------|
+| **Phala Official KMS** | Use the KMS hosted by Phala Network | Quick start, development, testing |
+| **Self-hosted KMS** | Deploy your own KMS instance | Production, compliance requirements, full control |
+
+For self-hosted KMS, you can deploy on:
+- **GCP** — See [Run a dstack-kms CVM on GCP](run-dstack-kms-on-gcp.md)
+- **Intel TDX Bare Metal** — Contact Phala for deployment guide
+
+> **Note:** The KMS only runs on GCP or Intel TDX bare metal. Nitro workloads can retrieve keys from any KMS (official or self-hosted).
+
+![Nitro KMS Key Delivery](../images/kms-key-delivery-nitro-v5.png)
+
+This means:
+1. `dstack-util` inside the Enclave sends a key request via VSOCK to the proxy on the host
+2. The proxy forwards the request to the dstack-kms over the network (RA-TLS)
+3. KMS verifies the Enclave's attestation (NSM Attestation Document)
+4. If verified, KMS delivers the key back through the encrypted channel
+5. `dstack-util` saves the key to `/var/run/dstack/keys.json` for your application to use
+
+> **Key difference from GCP:** On GCP, the Guest Agent manages the entire key lifecycle including automatic disk encryption. On Nitro, `dstack-util` only retrieves the key — your application is responsible for using it (e.g., encrypting model weights, decrypting secrets).
+
+For more details, see [KMS and Key Delivery](../concepts/kms-and-key-delivery.md).
+
 ---
 
 ## Step 1: Create Your App from the Template
