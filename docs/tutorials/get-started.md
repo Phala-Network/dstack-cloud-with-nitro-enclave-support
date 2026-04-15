@@ -1,81 +1,111 @@
-# Quick Start: Deploy Your First Dstack App on GCP
+# Quick Start: Deploy Your First dstack App on GCP
 
-This tutorial walks you through deploying a Docker application as a Confidential VM on Google Cloud Platform using dstack-cloud.
+This tutorial walks you through deploying a Docker application as a Confidential VM on Google Cloud Platform using `dstack-cloud`.
 
-**Estimated time:** 10-15 minutes
+**Estimated time:** 15–25 minutes (first run).
 
 **What you will do:**
 
-1. Install dstack-cloud CLI
-2. Configure GCP credentials
-3. Create a project and define your workload
-4. Deploy to GCP Confidential VM
-5. Verify the deployment and attestation
+1. Install `dstack-cloud` CLI
+2. Configure global GCP/KMS settings
+3. Create a project and define workload
+4. Deploy to GCP TDX CVM
+5. Verify workload access and runtime status
+
+---
 
 ## Prerequisites
 
-Before you begin, make sure you have:
+Before you begin:
 
-- A GCP account with **Confidential VM quota** (Intel TDX)
-- `gcloud` CLI installed and authenticated (`gcloud auth login`)
-- Docker installed on your local machine
+- GCP project with Intel TDX quota in target zone (for example `us-central1-a`)
+- `gcloud` authenticated
+  ```bash
+  gcloud auth login
+  gcloud config set project YOUR_PROJECT_ID
+  ```
+- Linux host
+- Docker installed
+- `gsutil`, `jq`, `mtools`, `dosfstools` installed
 
-### Verify GCP Confidential VM Quota
-
-Confidential VMs with Intel TDX may not be available in all regions. Check your quota:
-
-```bash
-gcloud compute project-info describe --project=your-project-id
-```
-
-Look for `N2D_CPUS` or similar quotas in your preferred region. If you need to request quota, visit the [GCP Console](https://console.cloud.google.com/iam-admin/quotas).
+---
 
 ## Step 1: Install dstack-cloud CLI
 
-Clone the repository and add the CLI to your PATH:
-
 ```bash
-# Clone the repository
-git clone https://github.com/Phala-Network/meta-dstack-cloud.git
-
-# Add CLI to PATH
-export PATH="$PATH:$(pwd)/meta-dstack-cloud/scripts/bin"
-
-# Verify installation
+curl -fsSL -o ~/.local/bin/dstack-cloud \
+  https://raw.githubusercontent.com/Phala-Network/meta-dstack-cloud/main/scripts/bin/dstack-cloud
+chmod +x ~/.local/bin/dstack-cloud
 dstack-cloud --help
 ```
 
-> **Note:** The CLI is currently distributed via the repository. Binary releases will be available soon.
+---
 
-## Step 2: Configure GCP Credentials
-
-Set up your GCP project and zone:
+## Step 2: Configure global settings
 
 ```bash
 dstack-cloud config-edit
 ```
 
-This opens the global configuration file. Configure the GCP section:
+Use JSON config (`~/.config/dstack-cloud/config.json`):
 
-```toml
-[gcp]
-project = "your-gcp-project-id"
-zone = "us-central1-a"
-machine_type = "n2d-standard-4"
+```json
+{
+  "services": {
+    "kms_urls": ["https://kms.tdxlab.dstack.org:12001"],
+    "gateway_urls": ["https://gateway.tdxlab.dstack.org:12002"],
+    "pccs_url": ""
+  },
+  "image_search_paths": ["/path/to/images"],
+  "gcp": {
+    "project": "YOUR_PROJECT_ID",
+    "zone": "us-central1-a",
+    "bucket": "gs://YOUR_BUCKET"
+  }
+}
 ```
 
-Replace `your-gcp-project-id` with your actual GCP project ID. The `n2d-standard-4` machine type supports Intel TDX.
-
-## Step 3: Create a Project
-
-Create a new dstack-cloud project:
+If bucket does not exist:
 
 ```bash
-dstack-cloud new my-first-app
+gcloud storage buckets create gs://YOUR_BUCKET --project YOUR_PROJECT_ID --location us-central1
+```
+
+### Optional: configure external KMS
+
+If you already deployed your own KMS, replace `services.kms_urls`:
+
+```json
+"services": {
+  "kms_urls": ["https://YOUR_KMS_IP_OR_DOMAIN:12001"]
+}
+```
+
+---
+
+## Step 3: Pull OS image
+
+```bash
+dstack-cloud pull https://github.com/Phala-Network/meta-dstack-cloud/releases/download/v0.6.0-test/dstack-cloud-0.6.0.tar.gz
+dstack-cloud pull https://github.com/Phala-Network/meta-dstack-cloud/releases/download/v0.6.0-test/dstack-cloud-0.6.0-uki.tar.gz
+```
+
+Verify:
+
+```bash
+ls -lh /path/to/images/dstack-cloud-0.6.0/disk.raw
+```
+
+---
+
+## Step 4: Create project
+
+```bash
+dstack-cloud new my-first-app --os-image dstack-cloud-0.6.0 --instance-name dstack-first-app
 cd my-first-app
 ```
 
-This creates a project directory with the following structure:
+Project files include:
 
 ```
 my-first-app/
@@ -85,11 +115,27 @@ my-first-app/
 └── prelaunch.sh        # Optional pre-launch script (e.g., setup, data download)
 ```
 
-The `prelaunch.sh` script runs before your containers start. You can use it for setup tasks, downloading data, or other initialization steps.
+---
 
-## Step 4: Define Your Workload
+## Step 5: Configure app
 
-Edit `docker-compose.yaml` to define your application. Here's a simple web server example:
+Edit `app.json` and set:
+
+- `gcp_config.project = "YOUR_PROJECT_ID"`
+- `gcp_config.zone = "us-central1-a"`
+- `gcp_config.bucket = "gs://YOUR_BUCKET"`
+
+Default key mode is `kms`. If you want no external KMS for a basic quick test, switch to:
+
+- `"key_provider": "tpm"`
+- `"gateway_enabled": false`
+- remove `.env` file and remove `env_file` field from `app.json`
+
+---
+
+## Step 6: Define workload
+
+Edit `docker-compose.yaml`:
 
 ```yaml
 services:
@@ -99,102 +145,32 @@ services:
       - "8080:80"
 ```
 
-For AI workloads with GPU:
+---
 
-```yaml
-services:
-  vllm:
-    image: vllm/vllm-openai:latest
-    runtime: nvidia
-    command: --model Qwen/Qwen2.5-7B-Instruct
-    ports:
-      - "8000:8000"
-```
-
-> **Note:** GPU workloads require NVIDIA Confidential Computing support and additional quota.
-
-## Step 5: Add Secrets (Optional)
-
-If your application needs secrets (API keys, database credentials), add them to `.env`:
+## Step 7: Deploy
 
 ```bash
-API_KEY=your-secret-key
-DATABASE_URL=postgres://user:pass@host:5432/db
+dstack-cloud deploy --delete
 ```
 
-**Important:** These values are encrypted before leaving your machine and only decrypted inside the TEE.
+This will create a TDX CVM and start your workload.
 
-## Step 6: Deploy
+---
 
-Deploy your application to GCP:
-
-```bash
-dstack-cloud deploy
-```
-
-The CLI will:
-
-1. Build and push your container configuration
-2. Create a Confidential VM with Intel TDX
-3. Boot dstack OS (the confidential guest OS)
-4. Start your containers
-5. Configure automatic disk encryption
-
-The deployment may take a few minutes. Once complete, note the **App ID** and **Public URL** displayed in the output.
-
-## Step 7: Check Status
-
-Monitor your deployment:
+## Step 8: Open firewall
 
 ```bash
-# Check deployment status
-dstack-cloud status
-
-# View container logs
-dstack-cloud logs
-
-# Follow logs in real-time
-dstack-cloud logs --follow
-```
-
-## Step 8: Configure Firewall
-
-Allow traffic to your application ports:
-
-```bash
-# Allow HTTPS (port 443)
-dstack-cloud fw allow 443
-
-# Allow your application port
 dstack-cloud fw allow 8080
-
-# List all firewall rules
-dstack-cloud fw list
 ```
 
-## Step 9: Access Your Application
+---
 
-Access your application via the public URL:
+## Step 9: Verify
 
 ```bash
-# Using curl
-curl https://app-abc123.your-gateway-domain.com
+dstack-cloud status
+dstack-cloud logs --follow
 
-# Or open in browser
-open https://app-abc123.your-gateway-domain.com
-```
-
-For specific ports:
-
-```
-https://app-abc123-8080.your-gateway-domain.com
-```
-
-## Step 10: Verify Attestation (Important)
-
-Verify that your application is running in a genuine TEE:
-
-```bash
 # Get attestation from your app
 curl https://app-abc123.your-gateway-domain.com/attestation
 
@@ -209,6 +185,14 @@ The attestation proves:
 
 For detailed verification, see [Attestation Integration](../concepts/attestation-integration.md).
 
+**Test workload:**
+
+```bash
+curl http://<EXTERNAL_IP>:8080
+```
+
+If gateway is enabled, use the URL shown by `dstack-cloud status`.
+
 ## Understanding What Happened
 
 When you deployed your application:
@@ -222,45 +206,28 @@ When you deployed your application:
 ### Key Delivery via KMS
 
 dstack uses an external **Key Management Service (dstack-kms)** to deliver keys to your confidential workloads. The KMS runs in its own TEE and only dispatches keys to workloads that pass attestation verification.
-
+---
+ 
 ## Managing Your Deployment
 
 Your application now runs in a hardware-protected environment where even the cloud provider cannot access the memory or data.
 
-Common management commands:
+---
 
-```bash
-# List all deployments
-dstack-cloud list
+## Troubleshooting
 
-# Stop a deployment
-dstack-cloud stop
+| Issue | Fix |
+|---|---|
+| `Boot image ... not found` | verify image path and `disk.raw` existence |
+| VM UEFI boot loop | use valid UKI boot image (`-uki.tar.gz`) |
+| `.env found but KMS is not enabled` | remove `.env` and remove `env_file` in `app.json` |
+| Port not reachable | ensure firewall rule exists and container has started |
+| missing `gsutil` / `mcopy` / `mkfs.fat` | install required dependencies |
 
-# Start a stopped deployment
-dstack-cloud start
+---
 
-# Remove a deployment completely
-dstack-cloud remove
-```
+## Next steps
 
-## Common Issues
-
-| Issue | Solution |
-|-------|----------|
-| Deployment stuck at "Creating VM" | Check GCP Confidential VM quota. Verify credentials with `gcloud auth list`. |
-| Container fails to start | Check logs with `dstack-cloud logs`. Verify `docker-compose.yaml` syntax. Ensure image is accessible in your chosen region. |
-| Cannot access application | Check firewall rules with `dstack-cloud fw list`. Verify port mappings in `docker-compose.yaml`. Check container health status in logs. |
-| Attestation verification fails | Ensure you're using production mode (not debug). Check that measurements match expected values. |
-
-## Next Steps
-
-Now that you've deployed your first confidential workload:
-
-- **[Run a Workload on GCP](../how-to/run-dstack-on-gcp.md)** — Detailed deployment options and configurations
-- **[Attestation Integration](../concepts/attestation-integration.md)** — Understand TDX + vTPM attestation in depth
-- **[Security Model](../concepts/security-model.md)** — Trust boundaries and security guarantees
-- **[Deploy on AWS Nitro](../how-to/run-dstack-on-nitro.md)** — Alternative deployment on AWS Nitro Enclaves
-
-For more information:
-- **[dstack-cloud Usage Guide](https://github.com/Phala-Network/dstack-cloud/blob/master/docs/usage.md)** — Complete CLI reference
-- **[GCP Attestation Details](https://github.com/Phala-Network/dstack-cloud/blob/master/docs/attestation-gcp.md)** — Technical deep-dive on TDX + TPM attestation
+- Detailed guide: [Run a Workload on GCP with Self-hosted KMS](../how-to/run-dstack-on-gcp.md)
+- External KMS flow: [Run a dstack-kms CVM on GCP](../how-to/run-dstack-kms-on-gcp.md)
+- Concepts: [Attestation Integration](../concepts/attestation-integration.md)

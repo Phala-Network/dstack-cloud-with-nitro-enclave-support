@@ -1,17 +1,27 @@
 # Run a Workload on GCP
 
-This guide explains how to deploy a Docker application as a dstack CVM (Confidential Virtual Machine) on GCP using Intel TDX.
+This guide explains how to deploy a Docker application as a dstack CVM (Confidential Virtual Machine) on GCP with Intel TDX.
+
+It also covers two key-management modes:
+
+- **Official/managed KMS endpoints** (quick start)
+- **External self-hosted KMS** (recommended for production/compliance)
+
+---
 
 ## Prerequisites
 
 - A GCP project with Confidential VM quota enabled
-  - Intel TDX Confidential VMs are available in select zones (e.g., `us-central1-a`)
+  - Intel TDX Confidential VMs are available in select zones (for example `us-central1-a`)
 - `gcloud` CLI installed and authenticated
   ```bash
   gcloud auth login
   gcloud config set project YOUR_PROJECT_ID
   ```
-- Docker installed on your local machine
+- Linux host for deployment (recommended)
+- Docker installed
+- `gsutil` available in PATH
+- `mtools` (`mcopy`) and `dosfstools` (`mkfs.fat`) installed
 - `dstack-cloud` CLI installed
   ```bash
   curl -fsSL -o ~/.local/bin/dstack-cloud \
@@ -19,128 +29,181 @@ This guide explains how to deploy a Docker application as a dstack CVM (Confiden
   chmod +x ~/.local/bin/dstack-cloud
   ```
 
-## Step 1: Configure dstack-cloud
+> Why Linux + mtools + dosfstools? `dstack-cloud deploy` builds a shared FAT image and needs these tools in local environment.
 
-Edit the dstack-cloud configuration:
+---
+
+## Step 1: Configure `dstack-cloud`
+
+Edit global config:
 
 ```bash
 dstack-cloud config-edit
 ```
 
-Set the following values:
+`dstack-cloud` uses **JSON** config (`~/.config/dstack-cloud/config.json`). Example:
 
-```toml
-[gcp]
-project = "YOUR_PROJECT_ID"
-zone = "us-central1-a"
-bucket = "gs://YOUR_BUCKET_NAME"
+```json
+{
+  "services": {
+    "kms_urls": ["https://kms.tdxlab.dstack.org:12001"],
+    "gateway_urls": ["https://gateway.tdxlab.dstack.org:12002"],
+    "pccs_url": ""
+  },
+  "image_search_paths": ["/path/to/images"],
+  "gcp": {
+    "project": "YOUR_PROJECT_ID",
+    "zone": "us-central1-a",
+    "bucket": "gs://YOUR_BUCKET_NAME"
+  }
+}
+```
 
-[kms]
-url = "https://your-kms-host:12001"
+Create bucket if needed:
 
-[gateway]
-url = "https://your-gateway-host"
+```bash
+gcloud storage buckets create gs://YOUR_BUCKET_NAME --project YOUR_PROJECT_ID --location us-central1
 ```
 
 ### KMS Options
 
-You have two options for the KMS:
-
 | Option | Description | When to Use |
-|--------|-------------|-------------|
-| **Phala Official KMS** | Use the KMS hosted by Phala Network | Quick start, development, testing |
-| **Self-hosted KMS** | Deploy your own KMS instance | Production, compliance requirements, full control |
+|---|---|---|
+| **Phala Official KMS** | Use managed KMS endpoints in `services.kms_urls` | Quick start, testing |
+| **Self-hosted KMS** | Use your own KMS endpoint in `services.kms_urls` | Production, compliance, full control |
 
-For self-hosted KMS, you can deploy on:
-- **GCP** — See [Run a dstack-kms CVM on GCP](run-dstack-kms-on-gcp.md)
-- **Intel TDX Bare Metal** — Contact Phala for deployment guide
+For Self-hosted KMS, point `services.kms_urls` to your deployed KMS URL, e.g.:
 
-![GCP KMS Key Delivery](../images/kms-key-delivery-gcp-v5.png)
-
-When your GCP CVM starts, the dstack-agent inside contacts the KMS via RA-TLS to retrieve encrypted keys. The KMS verifies the CVM's attestation before dispatching keys.
-
-### Configuration Fields
-
-- **`[kms] url`** — Address of your dstack-kms instance. The CVM's Guest Agent contacts this URL to retrieve keys after attestation. Required if you are using KMS mode (recommended for production).
-- **`[gateway] url`** — Address of the dstack gateway. The gateway handles TLS termination and routes traffic to your CVMs.
-
-The `[gcp] bucket` is used to store CVM images during the build and deploy process. Create it if it does not exist:
-
-```bash
-gsutil mb gs://YOUR_BUCKET_NAME
+```json
+"services": {
+  "kms_urls": ["https://YOUR_KMS_IP_OR_DOMAIN:12001"]
+}
 ```
+
+Example used in validation:
+
+```json
+"services": {
+  "kms_urls": ["https://136.119.90.147:12001"]
+}
+```
+
+If you run with key provider `tpm`/`none` (no external KMS), remove `.env` in project and remove `env_file` from `app.json`.
+
+---
 
 ## Step 2: Pull the OS Image
 
-Download the dstack OS image to your local machine:
+For `dstack-cloud-0.6.0`, download both archives:
 
 ```bash
-dstack-cloud pull --os-image dstack-cloud-0.6.0
+dstack-cloud pull https://github.com/Phala-Network/meta-dstack-cloud/releases/download/v0.6.0-test/dstack-cloud-0.6.0.tar.gz
+dstack-cloud pull https://github.com/Phala-Network/meta-dstack-cloud/releases/download/v0.6.0-test/dstack-cloud-0.6.0-uki.tar.gz
 ```
+
+Verify boot image file exists:
+
+```bash
+ls -lh /path/to/images/dstack-cloud-0.6.0/disk.raw
+```
+
+> If `disk.raw` is missing, VM may boot-loop with UEFI `Failed to load image`.
+
+---
 
 ## Step 3: Create a Project
 
 ```bash
-dstack-cloud new my-gcp-app --os-image dstack-cloud-0.6.0
+dstack-cloud new my-gcp-app --os-image dstack-cloud-0.6.0 --instance-name dstack-my-app
 cd my-gcp-app
 ```
 
-## Step 4: Define Your Application
+---
 
-Edit `docker-compose.yaml` to define your application:
+## Step 4: Configure Project (`app.json`)
+
+Update key fields in `app.json`:
+
+- `gcp_config.project`
+- `gcp_config.zone`
+- `gcp_config.bucket`
+- `gcp_config.instance_name`
+
+Choose key provider mode:
+
+- **External KMS mode (recommended):** `"key_provider": "kms"`
+- **No external KMS mode:** `"key_provider": "tpm"` (or `none`)
+
+Gateway options:
+
+- If you use dstack gateway URL routing, keep `gateway_enabled: true`
+- If you access service directly via VM public IP + opened port, set `gateway_enabled: false`
+
+---
+
+## Step 5: Define Your Application
+
+Edit `docker-compose.yaml`:
 
 ```yaml
 services:
   web:
     image: nginx:latest
     ports:
-      - "80:80"
+      - "8080:80"
 ```
 
-## Step 5: (Optional) Add Environment Variables
+---
 
-If your application needs secrets or configuration, add them to the `.env` file:
+## Step 6: (Optional) Add Environment Variables
 
-```
-API_KEY=your-api-key-here
+If your app needs secrets/config, create `.env`:
+
+```env
+API_KEY=your-api-key
 DATABASE_URL=postgres://user:pass@host:5432/db
 ```
 
-Environment variables are encrypted before leaving your machine and decrypted only inside the CVM.
+In KMS mode, env values are encrypted client-side and only decrypted inside CVM after attestation.
 
-## Step 6: Deploy
+---
+
+## Step 7: Deploy
 
 ```bash
-dstack-cloud deploy
+dstack-cloud deploy --delete
 ```
 
-dstack-cloud will:
+`dstack-cloud` will:
 
-1. Build the CVM image (packages your containers into dstack OS)
-2. Upload the image to your GCP bucket
-3. Create a Confidential VM instance with Intel TDX enabled
-4. Start the VM and run your containers
+1. Prepare shared config files
+2. Upload image artifacts to GCS
+3. Create a GCP TDX Confidential VM
+4. Start VM and run compose workload
 
-First deployment typically takes 5-10 minutes.
+First deployment usually takes several minutes.
 
-## Step 7: Open Firewall
+---
 
-Allow external access to your application:
+## Step 8: Open Firewall
+
+Open app port(s):
 
 ```bash
-# Allow HTTPS (port 443)
-dstack-cloud fw allow 443
-
-# Allow your application port
 dstack-cloud fw allow 8080
+```
 
-# List all firewall rules
+List firewall rules:
+
+```bash
 dstack-cloud fw list
 ```
 
-## Step 8: Verify
+---
 
-Check the deployment status:
+## Step 9: Verify
+
+Check status:
 
 ```bash
 dstack-cloud status
@@ -152,44 +215,43 @@ View logs:
 dstack-cloud logs --follow
 ```
 
-Access your application at the URL shown in the status output (typically `https://<app-id>.<gateway-domain>`).
+Access app:
+
+- Direct VM mode (`gateway_enabled=false`):
+  ```bash
+  curl http://<EXTERNAL_IP>:8080
+  ```
+- Gateway mode (`gateway_enabled=true`): use URL printed in `dstack-cloud status`.
+
+---
 
 ## Managing Your Deployment
 
-### View Logs
-
 ```bash
 dstack-cloud logs
-dstack-cloud logs --follow    # Real-time streaming
-```
-
-### Stop / Start
-
-```bash
 dstack-cloud stop
 dstack-cloud start
-```
-
-### Remove
-
-```bash
 dstack-cloud remove
 ```
 
-This deletes the GCP VM and associated resources.
+---
 
 ## Common Issues
 
 | Issue | Solution |
-|-------|----------|
-| "Confidential VM quota exceeded" | Request TDX quota increase in GCP Console → IAM & Admin → Quotas |
-| "Permission denied" on bucket | Run `gsutil iam ch allUsers:objectViewer gs://YOUR_BUCKET_NAME` or use a service account with storage permissions |
-| VM starts but container exits immediately | Check logs: `dstack-cloud logs`. Ensure the Docker image is valid and the container can start. |
-| Cannot access the application URL | Verify the firewall rule: `dstack-cloud fw allow <port>`. Also check GCP VPC firewall rules. |
-| Attestation fails | Ensure the VM is running as a Confidential VM (TDX). Check the GCP console for the `confidential-compute` flag. |
+|---|---|
+| `Boot image 'dstack-cloud-0.6.0' not found locally` | Ensure `disk.raw` exists under `<image_search_paths>/dstack-cloud-0.6.0/` |
+| VM RUNNING but serial log shows UEFI load failures | Wrong boot image source; use official `-uki.tar.gz` image containing `disk.raw` |
+| `gsutil` not found | Install Google Cloud SDK / ensure PATH |
+| `mcopy` not found | Install `mtools` |
+| `mkfs.fat` not found | Install `dosfstools` |
+| `.env found but KMS is not enabled` | Remove `.env` and remove `env_file` from `app.json`, or set key provider back to `kms` |
+| App not reachable immediately | Wait for compose startup to complete; check `dstack-cloud logs` |
+
+---
 
 ## Next Steps
 
-- **[Run a dstack-kms CVM on GCP](run-dstack-kms-on-gcp.md)** — Set up KMS for key management
-- **[Concept: Overview](../concepts/overview.md)** — Understand the architecture
-- **[Run a Workload on AWS Nitro](run-dstack-on-nitro.md)** — Deploy on AWS instead
+- [Run a dstack-kms CVM on GCP](run-dstack-kms-on-gcp.md)
+- [Attestation Integration](../concepts/attestation-integration.md)
+- [Run a Workload on AWS Nitro](run-dstack-on-nitro.md)
