@@ -206,6 +206,7 @@ When you deployed your application:
 ### Key Delivery via KMS
 
 dstack uses an external **Key Management Service (dstack-kms)** to deliver keys to your confidential workloads. The KMS runs in its own TEE and only dispatches keys to workloads that pass attestation verification.
+
 ---
  
 ## Managing Your Deployment
